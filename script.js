@@ -6,12 +6,32 @@
   var $$ = function (s, c) { return [].slice.call((c || document).querySelectorAll(s)); };
 
   // Fotos mostradas se a lista automática da pasta img não puder ser lida
-  var PADRAO = ['img/1.jpg', 'img/2.jpg', 'img/3.jpg', 'img/4.jpg', 'img/5.jpg', 'img/6.jpg', 'img/07.JPG', 'img/08.jpg', 'img/09.jpg', 'img/10.jpg', 'img/11.jpg'];
+  var PADRAO = ['img/1.jpg', 'img/2.jpg', 'img/3.jpg', 'img/4.jpg', 'img/07.JPG'];
   // Categorias do portfólio, pelo número da foto. Também funciona pelo nome: palco-12.jpg, editorial-13.jpg, social-14.jpg
-  var CATEGORIAS = { palco: [1, 2, 3, 4, 5], editorial: [6], social: [] };
+  var CATEGORIAS = { palco: [1, 2, 3, 4, 5, 7], editorial: [6], social: [] };
   var RESERVADOS = /^(favicon|logo|brush|thayna|hero|her[oó]i)/i;
 
   $('#ano').textContent = new Date().getFullYear();
+
+  // ---------- tema claro / escuro (círculo que se expande a partir do botão) ----------
+  var raiz = document.documentElement, btnTema = $('.tema'), metaTema = $('meta[name=theme-color]');
+  function pintar(t) {
+    raiz.dataset.theme = t; metaTema.content = t === 'light' ? '#fcf9f5' : '#0a0a0a';
+    btnTema.setAttribute('aria-label', t === 'light' ? 'Mudar para tema escuro' : 'Mudar para tema claro');
+  }
+  pintar(raiz.dataset.theme === 'light' ? 'light' : 'dark');
+  function trocar(t) { pintar(t); try { localStorage.setItem('tema', t); } catch (e) {} }
+  btnTema.addEventListener('click', function () {
+    var novo = raiz.dataset.theme === 'light' ? 'dark' : 'light';
+    if (!document.startViewTransition || reduce) { trocar(novo); return; }
+    var r = btnTema.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    var raio = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    var vt = document.startViewTransition(function () { trocar(novo); });
+    vt.ready.then(function () {
+      raiz.animate({ clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + raio + 'px at ' + x + 'px ' + y + 'px)'] },
+        { duration: 800, easing: 'cubic-bezier(.7,0,.2,1)', pseudoElement: '::view-transition-new(root)' });
+    }).catch(function () {});
+  });
 
   // ---------- títulos palavra por palavra ----------
   $$('[data-split]').forEach(function (el) {
@@ -158,6 +178,10 @@
     for (var k in CATEGORIAS) if (CATEGORIAS[k].indexOf(n) > -1) return k;
     return '';
   }
+  var aviso = document.createElement('p');
+  aviso.className = 'vazio';
+  aviso.textContent = 'As fotos ainda estão carregando ou não foram encontradas. Confira se estão na pasta img do repositório e atualize a página.';
+  setTimeout(function () { if (!figuras().some(function (f) { return f.classList.contains('ok'); })) grade.insertAdjacentElement('afterend', aviso); }, 8000);
   function figuras() { return $$('figure', grade); }
   function visiveis() { return figuras().filter(function (f) { return !f.hidden; }); }
 
@@ -170,7 +194,8 @@
       f.style.viewTransitionName = 'f' + i;
       im.src = encodeURI(p); im.loading = 'lazy'; im.decoding = 'async';
       im.alt = 'Maquiagem por Thayná Cobo, foto ' + (i + 1);
-      im.onerror = function () { f.remove(); };
+      im.onload = function () { f.classList.add('ok'); aviso.remove(); };
+      im.onerror = function () { console.warn('Foto não encontrada:', p); f.remove(); };
       f.appendChild(im);
       f.addEventListener('click', function () { abrir(f); });
       f.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(f); } });
